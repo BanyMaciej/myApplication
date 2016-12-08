@@ -1,0 +1,20 @@
+Current Battery Service state:
+  AC powered: false
+  USB powered: true
+  Wireless powered: false
+  Overload: true
+  USB overheat: false
+  Extension: 0
+  PowerJacketExist: false
+  PowerJacketStatus: 0
+  PowerJacketLevel: 0
+  PluginStatus: true
+  Unsupport Charger: false
+  status: 2
+  health: 2
+  present: true
+  level: 24
+  scale: 100
+  voltage: 3758
+  temperature: 370
+  technology: Li-poly

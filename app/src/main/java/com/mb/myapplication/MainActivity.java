@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
 
     SimpleDateFormat dataFormatter;
 
-    TextView sheduleTasks, packages, viewEvents;
+    TextView mSheduleTasksView, packagesView, eventsView;
 
     ArrayList<Current> currentData = new ArrayList<>();
 
@@ -48,9 +48,9 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        sheduleTasks = (TextView) findViewById(R.id.textView);
-        packages = (TextView) findViewById(R.id.packages);
-        viewEvents = (TextView) findViewById(R.id.uEvents);
+        mSheduleTasksView = (TextView) findViewById(R.id.textView);
+        packagesView = (TextView) findViewById(R.id.packages);
+        eventsView = (TextView) findViewById(R.id.uEvents);
 //        oldCurrent = getTotalBatteryCurrent();
 
         mUsageStatsManager = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
@@ -65,23 +65,23 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        sheduleTasks.setOnClickListener(new View.OnClickListener() {
+        mSheduleTasksView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                sheduleBatteryCurrent();
-                sheduleUsageEvents();
+                mScheduleBatteryCurrent();
+                mScheduleUsageEvents();
             }
         });
-        viewEvents.setOnClickListener(new View.OnClickListener() {
+        eventsView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 getUsageEvents(10, System.currentTimeMillis() - 1000*60*10);
             }
         });
-        packages.setOnClickListener(new View.OnClickListener() {
+        packagesView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                buildTv2Text(10);
+                packagesView.setText(formatUsageStats(10));
             }
         });
     }
@@ -106,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void sheduleUsageEvents() {
+    private void mScheduleUsageEvents() {
         Timer timer = new Timer();
         final TextView tv = (TextView) findViewById(R.id.uEvents);
         final long startTime = System.currentTimeMillis();
@@ -128,6 +128,62 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         timer.schedule(task, 0, 1000);
+    }
+
+    private void mScheduleUsageStats() {
+        Timer timer = new Timer();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                final String text = formatUsageStats(1);
+
+            }
+        };
+    }
+
+    private void mScheduleBatteryCurrent() {
+        Timer timer = new Timer();
+        final android.os.Handler handler = new android.os.Handler();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                current = getTotalBatteryCurrent();
+                if( !current.equals(oldCurrent) ) {
+                    oldCurrent = current;
+                    Long time = System.currentTimeMillis();
+                    final double avg;
+                    currentData.add(new Current(oldCurrent, time));
+                    if( currentData.size() > 4 ) {
+                        ArrayList<Current> c = new ArrayList<>();
+                        for( int i = 5; i > 0; i-- ) {
+                            c.add(currentData.get(currentData.size() - i));
+                        }
+                        avg = calculateAverage(c);
+                    } else {
+                        avg = 0L;
+                    }
+
+//                            avg = calculateAverage(currentData.subList(Math.max(currentData.size()-5, 0), currentData.size()-1));
+                    String text = "Current(mA):\t" + oldCurrent + "\t, average(mA):\t" + avg + "\t, t(ms):\t" + (time - currentData.get(Math.max(currentData.size()-6,0)).timeInMilis) + "\n";
+                    Log.d("LOGGER", text);
+                    writeToFile(text, getApplicationContext());
+
+                    new Thread(){
+                        public void run() {
+                            handler.post(new Runnable() {
+                                public void run() {
+                                    DecimalFormat df = new DecimalFormat("#.00");
+                                    mSheduleTasksView.setText("Current " + df.format(oldCurrent) + " mA, avg: " + df.format(avg) + " mA, count: " + currentData.size());
+                                }
+                            });
+                        }
+                    }.start();
+
+                }
+            }
+        };
+        timer.schedule(task, 0, 1000);
+
     }
 
     private String getUsageEvents(int minutes, long startTime) {
@@ -173,7 +229,7 @@ public class MainActivity extends AppCompatActivity {
 
                     Long timeDifference = System.currentTimeMillis() - event.getTimeStamp();
                     if( !events.hasNextEvent() ) {
-                        Log.d("LOGGER", "nie ma eventa!");
+//                        Log.d("LOGGER", "nie ma eventa!");
                         if( foregroundTimeMap.containsKey(applicationName) ) {
                             foregroundTimeMap.put(applicationName, foregroundTimeMap.get(applicationName) + timeDifference);
                         } else {
@@ -212,7 +268,7 @@ public class MainActivity extends AppCompatActivity {
         return builder.toString();
     }
 
-    private void buildTv2Text(int minutes) {
+    private String formatUsageStats(int seconds) {
 
         List<UsageStats> stats = getUsageStatistics(UsageStatsManager.INTERVAL_BEST);
 
@@ -220,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
         builder.append("\r\n");
         int c = 0;
         for ( UsageStats _stats : stats ) {
-            if (_stats.getLastTimeUsed() > (System.currentTimeMillis() - (1000*60*minutes)) ) {
+            if (_stats.getLastTimeUsed() > (System.currentTimeMillis() - (1000*seconds)) ) {
                 String dateString = dataFormatter.format(new Date(_stats.getLastTimeUsed()));
                 builder.append("app: ");
                 builder.append(_stats.getPackageName());
@@ -235,54 +291,10 @@ public class MainActivity extends AppCompatActivity {
                 c++;
             }
         }
-        ((TextView) findViewById(R.id.packages)).setText(builder.toString());
+//        ((TextView) findViewById(R.id.packages)).setText(builder.toString());
 
         Log.d("LOGGER", "size: " + c);
-    }
-
-    private void sheduleBatteryCurrent() {
-        Timer timer = new Timer();
-        final android.os.Handler handler = new android.os.Handler();
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-                current = getTotalBatteryCurrent();
-                if( !current.equals(oldCurrent) ) {
-                    oldCurrent = current;
-                    Long time = System.currentTimeMillis();
-                    final double avg;
-                    currentData.add(new Current(oldCurrent, time));
-                    if( currentData.size() > 4 ) {
-                        ArrayList<Current> c = new ArrayList<>();
-                        for( int i = 5; i > 0; i-- ) {
-                            c.add(currentData.get(currentData.size() - i));
-                        }
-                        avg = calculateAverage(c);
-                    } else {
-                        avg = 0L;
-                    }
-
-//                            avg = calculateAverage(currentData.subList(Math.max(currentData.size()-5, 0), currentData.size()-1));
-                    String text = "Current(mA):\t" + oldCurrent + "\t, average(mA):\t" + avg + "\t, t(ms):\t" + (time - currentData.get(Math.max(currentData.size()-6,0)).timeInMilis) + "\n";
-                    Log.d("LOGGER", text);
-                    writeToFile(text, getApplicationContext());
-
-                    new Thread(){
-                        public void run() {
-                            handler.post(new Runnable() {
-                                public void run() {
-                                    DecimalFormat df = new DecimalFormat("#.00");
-                                    sheduleTasks.setText("Current " + df.format(oldCurrent) + " mA, avg: " + df.format(avg) + " mA, count: " + currentData.size());
-                                }
-                            });
-                        }
-                    }.start();
-
-                }
-            }
-        };
-        timer.schedule(task, 0, 1000);
-
+        return builder.toString();
     }
 
     private void writeToFile(String data,Context context) {
